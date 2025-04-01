@@ -1,6 +1,26 @@
+"use client";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { createClient } from "@supabase/supabase-js";
+
+// Supabase Initialization
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function Home() {
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      let { data, error } = await supabase.from("users").select("*");
+      if (error) console.error("Error fetching data:", error);
+      else setData(data);
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -51,6 +71,18 @@ export default function Home() {
           </a>
         </div>
       </main>
+
+      <section className="p-4">
+        <h2 className="text-lg font-bold">Supabase Data</h2>
+        <ul>
+          {data.length > 0 ? (
+            data.map((item) => <li key={item.id}>{item.name}</li>)
+          ) : (
+            <p>No data found. Make sure your table exists!</p>
+          )}
+        </ul>
+      </section>
+
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
         <a
           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
