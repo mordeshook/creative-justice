@@ -1,3 +1,7 @@
 {
-  "/page": "app/page.js"
+  "/auth/page": "app/auth/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js",
+  "/profile-startup/page": "app/profile-startup/page.js",
+  "/profile/page": "app/profile/page.js"
 }

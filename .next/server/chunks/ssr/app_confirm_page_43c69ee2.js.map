@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 7, "column": 0}, "map": {"version":3,"sources":["file://C%3A/creative-justice/app/confirm/page.js"],"sourcesContent":["'use client';\r\n\r\nexport default function ConfirmPage() {\r\n  return (\r\n    <div className=\"flex flex-col items-center justify-center min-h-screen p-6 text-center\">\r\n      <h1 className=\"text-2xl font-bold mb-4\">Thanks for Signing Up!</h1>\r\n      <p className=\"text-gray-700 max-w-md\">\r\n        Welcome to the Creative Justice Challenge. A confirmation email has been sent to your inbox.\r\n        Please verify your email to complete your registration and begin building your profile.\r\n      </p>\r\n    </div>\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;AAAA;;AAEe,SAAS;IACtB,qBACE,8OAAC;QAAI,WAAU;;0BACb,8OAAC;gBAAG,WAAU;0BAA0B;;;;;;0BACxC,8OAAC;gBAAE,WAAU;0BAAyB;;;;;;;;;;;;AAM5C","debugId":null}}]
+}

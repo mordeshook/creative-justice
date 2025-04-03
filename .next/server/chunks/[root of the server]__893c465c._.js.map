@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 6, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"","debugId":null}},
+    {"offset": {"line": 52, "column": 0}, "map": {"version":3,"sources":["file://C%3A/creative-justice/app/api/test/route.js"],"sourcesContent":["// app/api/test/route.js\r\n\r\nexport async function GET() {\r\n  console.log(\"Supabase URL:\", process.env.NEXT_PUBLIC_SUPABASE_URL);\r\n  console.log(\"Anon Key:\", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);\r\n  console.log(\"Service Role Key:\", process.env.SUPABASE_SERVICE_ROLE_KEY);\r\n\r\n  return new Response(\r\n    JSON.stringify({\r\n      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,\r\n      anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,\r\n      serviceRole: process.env.SUPABASE_SERVICE_ROLE_KEY ? \"Loaded\" : \"Missing\",\r\n    }),\r\n    {\r\n      status: 200,\r\n      headers: { \"Content-Type\": \"application/json\" },\r\n    }\r\n  );\r\n}\r\n"],"names":[],"mappings":"AAAA,wBAAwB;;;;AAEjB,eAAe;IACpB,QAAQ,GAAG,CAAC;IACZ,QAAQ,GAAG,CAAC;IACZ,QAAQ,GAAG,CAAC,qBAAqB,QAAQ,GAAG,CAAC,yBAAyB;IAEtE,OAAO,IAAI,SACT,KAAK,SAAS,CAAC;QACb,WAAW;QACX,OAAO;QACP,aAAa,QAAQ,GAAG,CAAC,yBAAyB,GAAG,WAAW;IAClE,IACA;QACE,QAAQ;QACR,SAAS;YAAE,gBAAgB;QAAmB;IAChD;AAEJ","debugId":null}}]
+}
