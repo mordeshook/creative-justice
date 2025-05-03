@@ -3,23 +3,58 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setStatus('');
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setStatus(error.message);
-    } else {
-      setStatus('Logged in successfully.');
+
+    const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (loginError) {
+      setStatus(loginError.message);
+      setLoading(false);
+      return;
     }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setStatus('Login failed: user not found.');
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, bio')
+      .eq('auth_users_id', user.id)
+      .single();
+
+    if (!profile) {
+      await supabase.from('profiles').insert({
+        auth_users_id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || '',
+        bio: '',
+      });
+      router.push('/profile/create');
+      return;
+    }
+
+    if (!profile.bio || profile.bio.trim() === '') {
+      router.push('/profile/create');
+    } else {
+      router.push('/feed');
+    }
+
     setLoading(false);
   };
 
@@ -34,7 +69,7 @@ export default function Home() {
         <div className="flex justify-center flex-wrap gap-4">
           <Link href="/auth">
             <button className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 px-6 rounded-md shadow-md transition">
-              Start Creating
+              Create Account
             </button>
           </Link>
           <Link href="/inspired">
@@ -42,7 +77,7 @@ export default function Home() {
               Get Inspired
             </button>
           </Link>
-          <Link href="/challenges">
+          <Link href="/welcome">
             <button className="bg-gray-800 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-md transition">
               Explore Challenges
             </button>
@@ -91,7 +126,7 @@ export default function Home() {
       <section className="py-20 px-6 md:px-16 max-w-5xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-bold mb-6 text-center">What is nuveuu?</h2>
         <p className="text-lg md:text-xl text-center mb-12">
-        nuveuu is where creativity meets inspiration. Whether you’re an artist, advocate, dreamer, or muse — this is your space to create something meaningful.
+        nuveuu is where creativity meets inspiration - a new way to experience the web. For many - it's time for a new view. This is it. Whether you’re an artist, advocate, dreamer, muse or simply a wanderer — this is your space to experience something meaningful.
         </p>
         <div className="grid md:grid-cols-2 gap-10">
           <div>

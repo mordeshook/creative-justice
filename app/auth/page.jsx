@@ -4,19 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
-
 export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSigningIn, setIsSigningIn] = useState(true);
+  const [name, setName] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const router = useRouter();
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
-    setMessage('');
 
     if (isSigningIn) {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -26,75 +24,115 @@ export default function AuthPage() {
 
       if (signInError) return setError(signInError.message);
 
-      // Check if user has profile
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return setError('User not found');
+
       const { data: profile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, bio')
         .eq('auth_users_id', user.id)
         .single();
 
+      // If profile doesn't exist, create one
       if (!profile) {
-        router.push('/profile-startup');
-      } else {
-        router.push('/feed');
+        await supabase.from('profiles').insert({
+          auth_users_id: user.id,
+          email: user.email,
+          name: user.user_metadata?.name || '',
+          bio: '',
+        });
+        return router.push('/profile/create');
       }
+
+      // If bio is missing, send to profile create
+      if (!profile.bio || profile.bio.trim() === '') {
+        return router.push('/profile/create');
+      }
+
+      return router.push('/feed');
+
     } else {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name: name,
+          },
+        },
       });
 
       if (signUpError) return setError(signUpError.message);
 
-      router.push('/confirm'); // ✅ Show confirmation notice
+      router.push('/confirm');
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <h1 className="text-2xl font-semibold mb-4">
-        {isSigningIn ? 'Sign In' : 'Sign Up'}
-      </h1>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
+      <div className="w-full max-w-md bg-gray-50 rounded-lg shadow-md p-8 border">
+        <h1 className="text-3xl font-bold text-center text-pink-600 mb-4">Welcome to nuveuu</h1>
 
-      <form onSubmit={handleAuth} className="flex flex-col gap-3 w-full max-w-sm">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border px-3 py-2 rounded"
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="border px-3 py-2 rounded"
-          required
-        />
+        <p className="text-center text-gray-600 text-sm mb-6">
+          {isSigningIn
+            ? 'Enter your email and password to log in.'
+            : 'Create your account below. You’ll get an email to confirm it, and then we’ll guide you to build your profile.'}
+        </p>
+
+        <form onSubmit={handleAuth} className="flex flex-col gap-4">
+          {!isSigningIn && (
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="border border-gray-300 px-4 py-2 rounded-md"
+              required
+            />
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="border border-gray-300 px-4 py-2 rounded-md"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border border-gray-300 px-4 py-2 rounded-md"
+            required
+          />
+          <button
+            type="submit"
+            className="bg-pink-600 hover:bg-pink-700 text-white py-2 rounded-md font-semibold transition"
+          >
+            {isSigningIn ? 'Log In' : 'Create Account'}
+          </button>
+        </form>
+
+        {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+
         <button
-          type="submit"
-          className="bg-pink-500 hover:bg-pink-600 text-white py-2 rounded hover:bg-gray-800 transition"
+          onClick={() => {
+            setIsSigningIn(!isSigningIn);
+            setError('');
+          }}
+          className="text-sm text-blue-600 mt-4 hover:underline"
         >
-          {isSigningIn ? 'Sign In' : 'Sign Up'}
+          {isSigningIn ? 'Need an account? Create one' : 'Already have an account? Sign in'}
         </button>
-      </form>
 
-      {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-      {message && <p className="text-green-600 text-sm mt-3">{message}</p>}
-
-      <button
-        onClick={() => {
-          setIsSigningIn(!isSigningIn);
-          setError('');
-          setMessage('');
-        }}
-        className="text-sm text-blue-600 mt-4"
-      >
-        {isSigningIn ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
-      </button>
+        {!isSigningIn && (
+          <div className="mt-6 text-gray-500 text-xs text-center leading-5">
+            After signing up, you’ll get an email to confirm your account. Once confirmed,
+            we’ll take you to a short profile form to get started using nuveuu.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

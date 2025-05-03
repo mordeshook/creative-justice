@@ -153,16 +153,6 @@ export default function FeedPage() {
       } else {
         // Insert like notification for the post owner
         const postOwner = posts.find((post) => post.id === postId)?.auth_users_id;
-        if (postOwner) {
-          await supabase
-            .from('notifications')
-            .insert({
-              auth_users_id: postOwner,
-              type: 'like',
-              message: `${profile.name} liked your post`,
-              post_id: postId,
-            });
-        }
       }
     } else {
       await supabase
@@ -340,13 +330,22 @@ export default function FeedPage() {
   )}
 
 {!post.challenge_id && post.media_url && (
-  <img
-    src={post.media_url}
-    alt="Post"
-    className="w-full max-h-80 object-cover rounded cursor-pointer"
-    onClick={() => handleOpenImage(post)}
-  />
+  post.media_url.endsWith('.mp4') ? (
+    <video
+  controls
+  src={post.media_url}
+  className="w-full max-h-[500px] rounded-lg"
+/>
+  ) : (
+    <img
+      src={post.media_url}
+      alt="Post"
+      className="w-full max-h-80 object-cover rounded cursor-pointer"
+      onClick={() => handleOpenImage(post)}
+    />
+  )
 )}
+
 </div>
 
 

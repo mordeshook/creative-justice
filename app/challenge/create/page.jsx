@@ -11,6 +11,8 @@ export default function CreateChallengePage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [intent, setIntent] = useState("");
+  const [tonePrompt, setTonePrompt] = useState("");
+  const [mediumPrompt, setMediumPrompt] = useState("");
   const [budget, setBudget] = useState("");
   const [deadline, setDeadline] = useState("");
   const [asset, setAsset] = useState(null);
@@ -23,6 +25,8 @@ export default function CreateChallengePage() {
   const [saving, setSaving] = useState(false);
   const [aaaIdeas, setAaaIdeas] = useState([]);
   const [keptIdeas, setKeptIdeas] = useState([]);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingIdea, setEditingIdea] = useState(null);
   const [error, setError] = useState(null);
   const [loadingAAA, setLoadingAAA] = useState(false);
 
@@ -64,13 +68,10 @@ export default function CreateChallengePage() {
     const timestamp = Date.now();
     const filename = `${timestamp}_${file.name}`;
     const relativePath = `${userId}/${draftId}/${filename}`;
-
     const { error } = await supabase.storage
       .from("challenge-assets")
       .upload(relativePath, file, { upsert: true });
-
     if (error) throw error;
-
     return relativePath;
   };
 
@@ -84,17 +85,14 @@ export default function CreateChallengePage() {
     if (insertError) throw insertError;
 
     const draftId = inserted.id;
-
     if (file) {
       const relativePath = await uploadAsset(file, userId, draftId);
       const { error: updateError } = await supabase
         .from("challenge_drafts")
         .update({ assets: [relativePath] })
         .eq("id", draftId);
-
       if (updateError) throw updateError;
     }
-
     return draftId;
   };
 
@@ -130,7 +128,7 @@ export default function CreateChallengePage() {
             title: idea.title,
             description: idea.description,
             overview: idea.overview,
-            refined_intent: idea.refined_intent,
+            refined_intent: idea.intent,
             intent,
             board: selectedBoard,
             budget,
@@ -157,7 +155,10 @@ export default function CreateChallengePage() {
   const handleGenerateIdeas = async () => {
     setError(null);
     setLoadingAAA(true);
-    const payload = { input_text: description, intent };
+    const payload = {
+      input_text: description + `\nTone: ${tonePrompt}\nMedium: ${mediumPrompt}`,
+      intent
+    };
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -179,23 +180,26 @@ export default function CreateChallengePage() {
       }
 
       const data = await response.json();
-
-      const ideas = (data.ideas || []).map((idea) => {
-        const match = idea.description?.match(/Overview:\s*(.*?)\nIntent:\s*(.*?)\nRoles:/s);
-        return {
-          ...idea,
-          overview: match?.[1]?.trim() || "",
-          refined_intent: match?.[2]?.trim() || "",
-        };
-      });
-
-      setAaaIdeas(ideas);
+      setAaaIdeas(data.ideas || []);
     } catch (err) {
       console.error("AAA error:", err.message);
       setError("Failed to generate ideas.");
     } finally {
       setLoadingAAA(false);
     }
+  };
+
+  const handleEditIdea = (idx) => {
+    setEditingIndex(idx);
+    setEditingIdea({ ...aaaIdeas[idx] });
+  };
+
+  const handleSaveEdit = () => {
+    const updated = [...aaaIdeas];
+    updated[editingIndex] = editingIdea;
+    setAaaIdeas(updated);
+    setEditingIndex(null);
+    setEditingIdea(null);
   };
 
   useEffect(() => {
@@ -217,6 +221,12 @@ export default function CreateChallengePage() {
 
       <label className="block mb-2">Intent</label>
       <input className="w-full p-2 border rounded mb-4" value={intent} onChange={(e) => setIntent(e.target.value)} />
+
+      <label className="block mb-2">Tone / Style Prompt (Optional)</label>
+      <input className="w-full p-2 border rounded mb-4" value={tonePrompt} onChange={(e) => setTonePrompt(e.target.value)} placeholder="e.g., make it funny, nostalgic, emotional" />
+
+      <label className="block mb-2">Preferred Medium (Optional)</label>
+      <input className="w-full p-2 border rounded mb-4" value={mediumPrompt} onChange={(e) => setMediumPrompt(e.target.value)} placeholder="e.g., music, sculpture, photography" />
 
       <label className="block mb-2">Challenge Board</label>
       <select value={selectedBoard} onChange={(e) => setSelectedBoard(e.target.value)} className="w-full p-2 border rounded mb-4">
@@ -266,15 +276,29 @@ export default function CreateChallengePage() {
           <p className="text-sm text-gray-600 mb-2">Suggestions from Activate Agent Assistant:</p>
           {aaaIdeas.map((idea, idx) => (
             <div key={idx} className="p-3 border rounded mb-2 bg-white shadow-sm">
-              <strong>{idea.title}</strong>
-              <p>{idea.description}</p>
-              {idea.overview && <p className="text-sm italic mt-1">Overview: {idea.overview}</p>}
-              {idea.refined_intent && <p className="text-sm italic">Intent: {idea.refined_intent}</p>}
-              <p className="text-sm text-gray-500">Roles: {idea.roles?.join(", ")}</p>
-              <div className="mt-2 flex gap-2">
-                <button onClick={() => keepIdea(idea)} className="px-3 py-1 bg-green-600 text-white rounded text-sm">✅ Keep</button>
-                <button onClick={() => discardIdea(idea)} className="px-3 py-1 bg-red-500 text-white rounded text-sm">❌ Discard</button>
-              </div>
+              {editingIndex === idx ? (
+                <div>
+                  <input className="w-full p-2 border rounded mb-2" value={editingIdea.title} onChange={(e) => setEditingIdea({ ...editingIdea, title: e.target.value })} />
+                  <textarea className="w-full p-2 border rounded mb-2" value={editingIdea.description} onChange={(e) => setEditingIdea({ ...editingIdea, description: e.target.value })} />
+                  <textarea className="w-full p-2 border rounded mb-2" value={editingIdea.overview} onChange={(e) => setEditingIdea({ ...editingIdea, overview: e.target.value })} />
+                  <input className="w-full p-2 border rounded mb-2" value={editingIdea.intent} onChange={(e) => setEditingIdea({ ...editingIdea, intent: e.target.value })} />
+                  <input className="w-full p-2 border rounded mb-2" value={editingIdea.roles?.join(", ")} onChange={(e) => setEditingIdea({ ...editingIdea, roles: e.target.value.split(",").map(r => r.trim()) })} />
+                  <button onClick={handleSaveEdit} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">💾 Save Changes</button>
+                </div>
+              ) : (
+                <>
+                  <strong>{idea.title}</strong>
+                  <p>{idea.description}</p>
+                  {idea.overview && <p className="text-sm italic mt-1">Overview: {idea.overview}</p>}
+                  {idea.intent && <p className="text-sm italic">Intent: {idea.intent}</p>}
+                  <p className="text-sm text-gray-500">Roles: {idea.roles?.join(", ")}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => keepIdea(idea)} className="px-3 py-1 bg-green-600 text-white rounded text-sm">✅ Keep</button>
+                    <button onClick={() => discardIdea(idea)} className="px-3 py-1 bg-red-500 text-white rounded text-sm">❌ Discard</button>
+                    <button onClick={() => handleEditIdea(idx)} className="px-3 py-1 bg-gray-400 text-white rounded text-sm">✏️ Edit</button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -288,7 +312,7 @@ export default function CreateChallengePage() {
               <strong>{idea.title}</strong>
               <p>{idea.description}</p>
               {idea.overview && <p className="text-sm italic mt-1">Overview: {idea.overview}</p>}
-              {idea.refined_intent && <p className="text-sm italic">Intent: {idea.refined_intent}</p>}
+              {idea.intent && <p className="text-sm italic">Intent: {idea.intent}</p>}
               <p className="text-sm text-gray-600">Roles: {idea.roles?.join(", ")}</p>
             </div>
           ))}
