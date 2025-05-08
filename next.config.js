@@ -1,3 +1,5 @@
+// next.config.js
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -13,6 +15,9 @@ const nextConfig = {
         pathname: '/storage/**',
       },
     ],
+  },
+  experimental: {
+    forceSwcTransforms: true, // ✅ Force fresh chunk hash regeneration
   },
   webpack: (config) => {
     config.externals.push("canvas");
