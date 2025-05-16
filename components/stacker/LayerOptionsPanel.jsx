@@ -1,8 +1,8 @@
 // Component: LayerOptionsPanel.jsx
-
 "use client";
 
 import { useEffect, useState } from "react";
+import TextTools from "@/components/stacker/TextTools"; // ✅ Confirm path
 
 export default function LayerOptionsPanel({ layer, onUpdate }) {
   if (!layer) return null;
@@ -16,6 +16,19 @@ export default function LayerOptionsPanel({ layer, onUpdate }) {
   const handleChange = (key, value) => {
     setLocal((prev) => ({ ...prev, [key]: value }));
     onUpdate({ [key]: value });
+  };
+
+  const handleKeyframeChange = (frame, props) => {
+    const updatedKeyframes = Array.isArray(local.animations)
+      ? [...local.animations]
+      : [];
+    const existingIndex = updatedKeyframes.findIndex((k) => k.frame === frame);
+    if (existingIndex !== -1) {
+      updatedKeyframes[existingIndex] = { frame, props };
+    } else {
+      updatedKeyframes.push({ frame, props });
+    }
+    handleChange("animations", updatedKeyframes);
   };
 
   return (
@@ -54,24 +67,14 @@ export default function LayerOptionsPanel({ layer, onUpdate }) {
               className="w-full border rounded p-1"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium">Font Size</label>
-            <input
-              type="number"
-              value={local.fontSize || 24}
-              onChange={(e) => handleChange("fontSize", parseInt(e.target.value))}
-              className="w-full border rounded p-1"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Text Color</label>
-            <input
-              type="color"
-              value={local.fill || "#000000"}
-              onChange={(e) => handleChange("fill", e.target.value)}
-              className="w-full"
-            />
-          </div>
+          <TextTools
+            selectedText={local}
+            onUpdate={(updates) =>
+              Object.entries(updates).forEach(([key, value]) =>
+                handleChange(key, value)
+              )
+            }
+          />
         </>
       )}
 
@@ -100,7 +103,9 @@ export default function LayerOptionsPanel({ layer, onUpdate }) {
             <input
               type="number"
               value={local.strokeWidth || 1}
-              onChange={(e) => handleChange("strokeWidth", parseInt(e.target.value))}
+              onChange={(e) =>
+                handleChange("strokeWidth", parseInt(e.target.value))
+              }
               className="w-full border rounded p-1"
             />
           </div>
@@ -135,12 +140,42 @@ export default function LayerOptionsPanel({ layer, onUpdate }) {
               max="1"
               step="0.01"
               value={local.opacity || 1}
-              onChange={(e) => handleChange("opacity", parseFloat(e.target.value))}
+              onChange={(e) =>
+                handleChange("opacity", parseFloat(e.target.value))
+              }
               className="w-full"
             />
           </div>
         </>
       )}
+
+      {/* Animation Section */}
+      <div className="pt-4 border-t">
+        <h3 className="text-md font-semibold">Animation Keyframe</h3>
+        <div className="space-y-2">
+          <div>
+            <label className="block text-sm">Frame</label>
+            <input
+              type="number"
+              min="0"
+              defaultValue={0}
+              onBlur={(e) =>
+                handleKeyframeChange(parseInt(e.target.value), {
+                  x: local.x,
+                  y: local.y,
+                  width: local.width,
+                  height: local.height,
+                  opacity: local.opacity,
+                  fontSize: local.fontSize,
+                  fill: local.fill,
+                  fontFamily: local.fontFamily,
+                })
+              }
+              className="w-full border rounded p-1"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

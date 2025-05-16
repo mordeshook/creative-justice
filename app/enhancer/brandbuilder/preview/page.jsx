@@ -11,6 +11,7 @@ export default function BrandBookPreview() {
   const router = useRouter();
   const [draftId, setDraftId] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -26,7 +27,10 @@ export default function BrandBookPreview() {
       const { data: sessionData } = await supabase.auth.getSession();
       const session = sessionData?.session;
 
-      if (!session?.user?.id) return;
+      if (!session?.user?.id) {
+        console.error("❌ No active session found.");
+        return;
+      }
 
       const { data, error } = await supabase
         .from("brand_profiles_drafts")
@@ -35,7 +39,10 @@ export default function BrandBookPreview() {
         .eq("auth_users_id", session.user.id)
         .single();
 
-      if (error) return;
+      if (error) {
+        console.error("❌ Supabase fetch error:", error);
+        return;
+      }
 
       setProfile(data);
     };
@@ -44,35 +51,67 @@ export default function BrandBookPreview() {
   }, [draftId]);
 
   const handleExportPDF = async () => {
-    if (!draftId) return;
+    if (!draftId || isExporting) return;
 
-    const response = await fetch(`/api/export-brandbook?id=${draftId}`);
-    if (!response.ok) {
-      alert("❌ Failed to generate PDF.");
-      return;
+    setIsExporting(true);
+    const exportUrl = `https://nuveuu.com/export-print?id=${draftId}`;
+    const modalEndpoint = "https://mordeshook--pdf-generator-generate-pdf.modal.run/";
+
+    console.log("📤 Sending POST to Modal:", modalEndpoint);
+    console.log("📦 Payload:", { url: exportUrl });
+
+    const formBody = new FormData();
+    formBody.append("url", exportUrl);
+
+    try {
+      const response = await fetch(modalEndpoint, {
+        method: "POST",
+        body: formBody,
+      });
+
+      console.log("📥 Response status:", response.status);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("❌ PDF generation failed:", errText);
+        alert("PDF generation failed.");
+        return;
+      }
+
+      const blob = await response.blob();
+      console.log("✅ PDF blob received, size:", blob.size);
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `BrandBook-${draftId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      console.log("🎉 Download triggered successfully");
+    } catch (err) {
+      console.error("❌ Fetch error:", err);
+      alert("PDF generation failed.");
+    } finally {
+      setIsExporting(false);
     }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "BrandBook.pdf";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
   };
 
-  if (!profile) return <p className="p-6 text-gray-500">Loading brand book...</p>;
+  if (!profile) return <p className="p-6 text-gray-500">Loading brand book.</p>;
 
   return (
     <div className="p-6">
       <div className="max-w-4xl mx-auto mb-4 text-right">
         <button
           onClick={handleExportPDF}
-          className="bg-black text-white px-6 py-2 rounded hover:bg-gray-800"
+          disabled={isExporting}
+          className={`bg-black text-white px-6 py-2 rounded hover:bg-gray-800 ${
+            isExporting ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
-          Export as PDF
+          {isExporting ? "Generating PDF..." : "Export as PDF"}
         </button>
       </div>
 

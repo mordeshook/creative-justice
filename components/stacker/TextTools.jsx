@@ -1,14 +1,19 @@
-
 // Components: TextTools.jsx
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function TextTools({ selectedText, onUpdate }) {
   const [fontSize, setFontSize] = useState(selectedText?.fontSize || 24);
   const [fontFamily, setFontFamily] = useState(selectedText?.fontFamily || "Arial");
   const [color, setColor] = useState(selectedText?.fill || "#000000");
+
+  // 🔁 Sync local state when selectedText changes
+  useEffect(() => {
+    setFontSize(selectedText?.fontSize || 24);
+    setFontFamily(selectedText?.fontFamily || "Arial");
+    setColor(selectedText?.fill || "#000000");
+  }, [selectedText]);
 
   return (
     <div className="p-4 border rounded bg-white shadow space-y-4">

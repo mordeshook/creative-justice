@@ -1,0 +1,1 @@
+// supabase\functions\get-minimax-text-video\index.ts

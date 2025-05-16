@@ -1,250 +1,455 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import StackerCanvas from "@/components/stacker/StackerCanvas";
+import React, { useState, useEffect } from "react";
+import { CanvasEngine } from "@/components/stacker/CanvasEngine";
 import ToolBar from "@/components/stacker/Toolbar";
+import LeftPanel from "@/components/stacker/LeftPanel";
+import { useLayerState } from "@/components/stacker/hooks/useLayerState";
+import TimelinePanel from "@/components/stacker/TimelinePanel";
+import LayerOptionsPanel from "@/components/stacker/LayerOptionsPanel";
+import CuePointPanel from "@/components/stacker/panels/CuePointPanel";
 import TextEditorDialog from "@/components/stacker/TextEditorDialog";
 import ImageUploadDialog from "@/components/stacker/ImageUploadDialog";
-import ExportOptions from "@/components/stacker/ExportOptions";
 import AIPromptDialog from "@/components/stacker/AIPromptDialog";
-import LayerOptionsPanel from "@/components/stacker/LayerOptionsPanel";
-import LeftPanel from "@/components/stacker/LeftPanel";
 import SaveStackDialog from "@/components/stacker/SaveStackDialog";
-import useHistory from "@/components/stacker/HistoryManager";
-import { supabase } from "@/lib/supabaseClient";
-import { toast } from "sonner";
-import { saveStack } from "@/components/stacker/SaveStackLogic";
+import TimelineScrubber from "@/components/stacker/TimelineScrubber";
+import { useTimelinePlayer } from "@/components/stacker/hooks/useTimelinePlayer";
+import { useUndoManager } from "@/components/stacker/hooks/useUndoManager";
+import { useToolSelector } from "@/components/stacker/hooks/useToolSelector";
+import { useAIPromptDialog } from "@/components/stacker/hooks/useAIPromptDialog";
 
-const CANVAS_WIDTH = 1000;
-const CANVAS_HEIGHT = 800;
-
-export default function EditorClient() {
-  const searchParams = useSearchParams();
-  const stackId = searchParams.get("id");
-
-  const stageRef = useRef(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [textDialogOpen, setTextDialogOpen] = useState(false);
-  const [imageDialogOpen, setImageDialogOpen] = useState(false);
-  const [aiDialogOpen, setAIDialogOpen] = useState(false);
-  const [aiPrompt, setAIPrompt] = useState("");
-  const [backgroundColor, setBackgroundColor] = useState("#ffffff");
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+export default function EditorClient_Konva() {
+  useToolSelector();
 
   const {
-    state: layers,
-    set: setLayers,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-  } = useHistory([]);
+    layers = [],
+    setLayers = () => {},
+    selectedId = null,
+    setSelectedId = () => {},
+  } = useLayerState() || {};
 
-  useEffect(() => {
-    if (!stackId) return;
-    const loadStack = async () => {
-      const { data, error } = await supabase
-        .from("stacks")
-        .select("layers")
-        .eq("id", stackId)
-        .single();
-      if (error) {
-        console.error("Failed to load stack:", error);
-      } else {
-        setLayers(data.layers || []);
-      }
-    };
-    loadStack();
-  }, [stackId]);
+  const undoManager = useUndoManager() || {};
+  const { undo = () => {}, redo = () => {} } = undoManager;
 
-  const addLayer = (type) => {
-    if (type === "text") setTextDialogOpen(true);
-    else if (type === "image") setImageDialogOpen(true);
-    else if (type === "shape") {
-      const newLayer = {
-        id: Date.now(),
-        type: "shape",
-        shape: "rectangle",
-        fill: "#FF0000",
-        stroke: "#000000",
-        strokeWidth: 2,
-        x: CANVAS_WIDTH / 2 - 50,
-        y: CANVAS_HEIGHT / 2 - 50,
-        width: 100,
-        height: 100,
-      };
-      setLayers([...layers, newLayer]);
-    } else if (type === "ai") setAIDialogOpen(true);
-  };
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [editingText, setEditingText] = useState(null);
+  const [activeSymbolId, setActiveSymbolId] = useState(null);
+  const [symbolLibrary, setSymbolLibrary] = useState({});
+  const [selectedIds, setSelectedIds] = useState([]);
 
-  const handleAddText = (props) => {
-    const newLayer = {
-      id: Date.now(),
-      type: "text",
-      ...props,
-      x: CANVAS_WIDTH / 2,
-      y: CANVAS_HEIGHT / 2,
-    };
-    setLayers([...layers, newLayer]);
-    setTextDialogOpen(false);
-  };
+  const timelinePlayer = useTimelinePlayer({ fps: 24, totalFrames: 120 }) || {};
+  const { frame = 0, setFrame = () => {}, play = () => {}, stop = () => {} } = timelinePlayer;
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  const handleAddImage = (preview) => {
-    const newLayer = {
-      id: Date.now(),
-      type: "image",
-      url: preview,
-      x: CANVAS_WIDTH / 2 - 100,
-      y: CANVAS_HEIGHT / 2 - 100,
-      width: 200,
-      height: 200,
-    };
-    setLayers([...layers, newLayer]);
-    setImageDialogOpen(false);
-  };
-
-  const handleAddAIGeneratedImage = async (prompt) => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error("User not logged in");
-
-      const res = await fetch("https://tyxhurtlifaufindxhex.supabase.co/functions/v1/generate-image-stability", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ prompt }),
-      });
-
-      const { imageUrl } = await res.json();
-      if (!res.ok || !imageUrl) throw new Error("Image generation failed");
-
-      const newLayer = {
-        id: Date.now(),
-        type: "image",
-        url: imageUrl,
-        x: CANVAS_WIDTH / 2 - 100,
-        y: CANVAS_HEIGHT / 2 - 100,
-        width: 200,
-        height: 200,
-      };
+  const aiPrompt = useAIPromptDialog({
+    onInsertLayer: (newLayer) => {
       setLayers((prev) => [...prev, newLayer]);
-    } catch (err) {
-      console.error("❌ AI image generation error:", err);
-      toast.error(err.message || "AI image generation failed.");
+    },
+  });
+
+  // Fake initial symbol for testing
+  useEffect(() => {
+    setSymbolLibrary({
+      "test-symbol": {
+        layers: [
+          {
+            id: "inner-text",
+            type: "text",
+            content: "Inside Symbol!",
+            fontSize: 32,
+            x: 200,
+            y: 250,
+            keyframes: [0],
+            frames: {
+              0: {
+                type: "key",
+                data: {
+                  id: "inner-text",
+                  type: "text",
+                  content: "Inside Symbol!",
+                  fontSize: 32,
+                  x: 200,
+                  y: 250,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+  }, []);
+
+  const onAddKeyframe = (layerId, frameIndex) => {
+    const update = (layers) =>
+      layers.map((l) =>
+        l.id === layerId
+          ? {
+              ...l,
+              keyframes: [...new Set([...(l.keyframes || []), frameIndex])],
+            }
+          : l
+      );
+
+    if (activeSymbolId) {
+      setSymbolLibrary((prev) => ({
+        ...prev,
+        [activeSymbolId]: { layers: update(prev[activeSymbolId]?.layers || []) },
+      }));
+    } else {
+      setLayers(update);
     }
   };
 
-  const handleSaveStack = async (stackName) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const onPlayToggle = () => {
+    isPlaying ? stop() : play();
+    setIsPlaying(!isPlaying);
+  };
 
-    await saveStack({
-      stageRef,
-      stackId,
-      layers,
-      user,
-      stackName,
+  const onStop = () => {
+    stop();
+    setIsPlaying(false);
+  };
+
+  const onSeek = (frameNum) => setFrame(frameNum);
+  const onFrameScrub = (frameNum) => setFrame(frameNum);
+
+  const symbolLayers = symbolLibrary[activeSymbolId]?.layers || [];
+
+const handleLayerUpdate = (id, updates) => {
+  const update = (layers) =>
+    layers.map((layer) => {
+      if (layer.id !== id) return layer;
+      const frameData = layer.frames?.[frame];
+      if (!frameData || frameData.type !== "key") return layer;
+
+      return {
+        ...layer,
+        frames: {
+          ...layer.frames,
+          [frame]: {
+            ...frameData,
+            data: {
+              ...frameData.data,
+              ...updates,
+            },
+          },
+        },
+      };
     });
-  };
 
-  const updateLayer = (id, updates) => {
-    setLayers(layers.map((l) => (l.id === id ? { ...l, ...updates } : l)));
-  };
+  if (activeSymbolId) {
+    setSymbolLibrary((prev) => ({
+      ...prev,
+      [activeSymbolId]: {
+        layers: update(prev[activeSymbolId]?.layers || []),
+      },
+    }));
+  } else {
+    setLayers(update);
+  }
+};
 
-  const removeLayer = (id) => {
-    setLayers(layers.filter((l) => l.id !== id));
-    if (selectedId === id) setSelectedId(null);
-  };
 
-  const moveLayer = (index, direction) => {
-    const newLayers = [...layers];
-    const target = newLayers.splice(index, 1)[0];
-    newLayers.splice(index + direction, 0, target);
-    setLayers(newLayers);
-  };
-
-  const toggleVisibility = (id) => {
-    updateLayer(id, { visible: !layers.find((l) => l.id === id)?.visible });
-  };
-
-  const toggleLock = (id) => {
-    updateLayer(id, { locked: !layers.find((l) => l.id === id)?.locked });
-  };
+  const currentLayers = activeSymbolId ? symbolLayers : layers;
 
   return (
-    <div className="flex flex-col min-h-screen w-screen overflow-x-hidden items-start justify-start">
+    <>
       <ToolBar
-        onAddLayer={addLayer}
+        onAddLayer={(type) => {
+          const newId = Date.now();
+          const base = {
+            id: newId,
+            type,
+            content: type === "text" ? "New Heading" : "New Paragraph",
+            fontSize: type === "text" ? 28 : 16,
+            x: 500,
+            y: 300,
+            keyframes: [0],
+            frames: {
+              0: {
+                type: "key",
+                data: {
+                  id: newId,
+                  type,
+                  content: type === "text" ? "New Heading" : "New Paragraph",
+                  x: 500,
+                  y: 300,
+                  fontSize: type === "text" ? 28 : 16,
+                },
+              },
+            },
+          };
+
+          if (type === "ai") {
+            aiPrompt.toggle();
+          } else if (type === "text" || type === "paragraph") {
+            activeSymbolId
+              ? setSymbolLibrary((prev) => ({
+                  ...prev,
+                  [activeSymbolId]: {
+                    layers: [...(prev[activeSymbolId]?.layers || []), base],
+                  },
+                }))
+              : setLayers((prev) => [...prev, base]);
+          } else if (type === "image") {
+            setShowImageUpload(true);
+          } else if (type === "shape") {
+            const shape = {
+              id: newId,
+              type: "shape",
+              fill: "#FF0000",
+              stroke: "#000000",
+              strokeWidth: 2,
+              x: 500,
+              y: 400,
+              keyframes: [0],
+              frames: {
+                0: {
+                  type: "shape",
+                  x: 500,
+                  y: 400,
+                  fill: "#FF0000",
+                  stroke: "#000000",
+                  strokeWidth: 2,
+                },
+              },
+            };
+            activeSymbolId
+              ? setSymbolLibrary((prev) => ({
+                  ...prev,
+                  [activeSymbolId]: {
+                    layers: [...(prev[activeSymbolId]?.layers || []), shape],
+                  },
+                }))
+              : setLayers((prev) => [...prev, shape]);
+          }
+        }}
         onUndo={undo}
         onRedo={redo}
-        onExport={() => setSaveDialogOpen(true)}
+        onExport={() => {}}
       />
 
-      <div className="flex flex-grow min-h-0 w-full overflow-hidden">
+      {selectedIds.length > 1 && (
+        <div className="bg-blue-100 text-sm px-4 py-2 flex items-center justify-between">
+          <div>{selectedIds.length} layers selected</div>
+          <button
+            className="bg-blue-600 text-white px-3 py-1 rounded"
+            onClick={() => {
+              const newSymbolId = "symbol-" + Date.now();
+              const selectedLayers = currentLayers.filter((l) => selectedIds.includes(l.id));
+              const symbolInstance = {
+                id: Date.now(),
+                type: "symbol",
+                symbolId: newSymbolId,
+                x: 500,
+                y: 300,
+                keyframes: [0],
+                frames: {
+                  0: {
+                    type: "key",
+                    data: {
+                      id: Date.now(),
+                      type: "symbol",
+                      symbolId: newSymbolId,
+                      x: 500,
+                      y: 300,
+                    },
+                  },
+                },
+              };
+
+              setSymbolLibrary((prev) => ({
+                ...prev,
+                [newSymbolId]: { layers: selectedLayers },
+              }));
+
+              setLayers((prev) => [
+                ...prev.filter((l) => !selectedIds.includes(l.id)),
+                symbolInstance,
+              ]);
+
+              setSelectedIds([]);
+            }}
+          >
+            Convert to Symbol
+          </button>
+        </div>
+      )}
+
+      <div className="flex">
         <LeftPanel
-          layers={layers}
+          layers={currentLayers}
           selectedId={selectedId}
-          onSelect={setSelectedId}
-          onRemove={removeLayer}
-          onToggleVisibility={toggleVisibility}
-          onToggleLock={toggleLock}
-          onMoveLayer={moveLayer}
-          onAddShape={(shape) => setLayers([...layers, { id: Date.now(), ...shape }])}
-          backgroundColor={backgroundColor}
-          setBackgroundColor={setBackgroundColor}
-          stageRef={stageRef}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setSelectedIds([id]);
+          }}
+          onRemove={(id) =>
+            activeSymbolId
+              ? setSymbolLibrary((prev) => ({
+                  ...prev,
+                  [activeSymbolId]: {
+                    layers: prev[activeSymbolId].layers.filter((l) => l.id !== id),
+                  },
+                }))
+              : setLayers((prev) => prev.filter((l) => l.id !== id))
+          }
+          onToggleVisibility={(id) => handleLayerUpdate(id, { visible: false })}
+          onToggleLock={(id) => handleLayerUpdate(id, { locked: true })}
+          onMoveLayer={() => {}}
+          onAddShape={() => {}}
+          stageRef={{ current: null }}
         />
 
-        <div className="flex-1 flex items-center justify-center bg-gray-100 min-w-0 min-h-0 overflow-auto">
-          <div className="w-[1000px] h-[800px] flex items-center justify-center">
-            <StackerCanvas
-              stageRef={stageRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              layers={layers}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onChange={updateLayer}
-              backgroundColor={backgroundColor}
-            />
-          </div>
+        <div className="flex-1">
+          {activeSymbolId && (
+            <div className="bg-yellow-100 text-sm px-4 py-2 font-bold flex justify-between items-center">
+              Editing Symbol: {activeSymbolId}
+              <button
+                className="bg-red-500 text-white px-2 py-1 rounded"
+                onClick={() => setActiveSymbolId(null)}
+              >
+                Exit Symbol
+              </button>
+            </div>
+          )}
+
+          <CanvasEngine
+            layers={currentLayers}
+            currentFrame={frame}
+            selectedId={selectedId}
+            selectedIds={selectedIds}
+            onSelect={(id) => {
+              setSelectedId(id);
+              setSelectedIds([id]); // you can add multi-select logic later
+            }}
+            onChange={handleLayerUpdate}
+            onDoubleClick={(id) => {
+              const layer = currentLayers.find((l) => l.id === id);
+              if (layer?.type === "symbol") {
+                setActiveSymbolId(layer.symbolId);
+              } else if (layer?.type === "text" || layer?.type === "paragraph") {
+                setEditingText({
+                  id,
+                  content: layer.frames[frame]?.data?.content || "",
+                });
+              }
+            }}
+          />
+
+          <TimelineScrubber frame={frame} setFrame={setFrame} />
         </div>
 
-        <div className="w-80 shrink-0 border-l bg-white shadow overflow-y-auto">
-          {selectedId ? (
-            <LayerOptionsPanel
-              layer={layers.find((l) => l.id === selectedId)}
-              onUpdate={(updates) => updateLayer(selectedId, updates)}
+        <div className="w-[280px] border-l bg-white overflow-y-auto">
+          <LayerOptionsPanel
+            layer={currentLayers.find((l) => l.id === selectedId)}
+            onUpdate={(updates) => handleLayerUpdate(selectedId, updates)}
+          />
+          {selectedId && (
+            <CuePointPanel
+              layerId={selectedId}
+              currentFrame={frame}
+              onAddCue={(cue) => console.log("Cue added", cue)}
+              onRemoveCue={(id) => console.log("Cue removed", id)}
             />
-          ) : (
-            <div className="p-4 text-gray-400 italic text-sm">Select a layer to edit</div>
           )}
         </div>
       </div>
 
-      <TextEditorDialog open={textDialogOpen} onClose={() => setTextDialogOpen(false)} onSave={handleAddText} />
-      <ImageUploadDialog isOpen={imageDialogOpen} onClose={() => setImageDialogOpen(false)} onUpload={handleAddImage} />
-      <AIPromptDialog
-        open={aiDialogOpen}
-        onClose={() => setAIDialogOpen(false)}
-        onSubmit={handleAddAIGeneratedImage}
-        prompt={aiPrompt}
-        setPrompt={setAIPrompt}
+      <TimelinePanel
+        layers={currentLayers}
+        currentFrame={frame}
+        totalFrames={120}
+        onSeek={onSeek}
+        onAddKeyframe={onAddKeyframe}
+        onFrameScrub={onFrameScrub}
+        onPlayToggle={onPlayToggle}
+        onStop={onStop}
+        isPlaying={isPlaying}
+        onToggleVisibility={(id) => handleLayerUpdate(id, { visible: false })}
+        onToggleLock={(id) => handleLayerUpdate(id, { locked: true })}
+        onRenameLayer={() => {}}
+        onDeleteLayer={() => {}}
       />
-      <SaveStackDialog
-        open={saveDialogOpen}
-        onClose={() => setSaveDialogOpen(false)}
-        onSave={(stackName) => {
-          handleSaveStack(stackName);
-          setSaveDialogOpen(false);
+
+      <TextEditorDialog
+        open={!!editingText}
+        onClose={() => setEditingText(null)}
+        value={editingText?.content || ""}
+        onSave={(newText) => {
+          setLayers((prev) =>
+            prev.map((layer) => {
+              if (layer.id !== editingText.id) return layer;
+              return {
+                ...layer,
+                frames: {
+                  ...layer.frames,
+                  [frame]: {
+                    ...layer.frames[frame],
+                    data: {
+                      ...layer.frames[frame].data,
+                      content: newText,
+                    },
+                  },
+                },
+              };
+            })
+          );
+          setEditingText(null);
         }}
       />
-    </div>
+
+      <SaveStackDialog open={false} onClose={() => {}} onSave={() => {}} />
+
+      <AIPromptDialog
+        open={aiPrompt.open}
+        onClose={aiPrompt.close}
+        onSubmit={aiPrompt.onSubmit}
+        prompt={aiPrompt.prompt}
+        setPrompt={aiPrompt.setPrompt}
+      />
+
+      <ImageUploadDialog
+        isOpen={showImageUpload}
+        onClose={() => setShowImageUpload(false)}
+        onUpload={(previewUrl) => {
+          const newId = Date.now();
+          const layer = {
+            id: newId,
+            type: "image",
+            url: previewUrl,
+            x: 500,
+            y: 400,
+            width: 512,
+            height: 512,
+            opacity: 1,
+            keyframes: [0],
+            frames: {
+              0: {
+                type: "key",
+                data: {
+                  id: newId,
+                  type: "image",
+                  url: previewUrl,
+                  x: 500,
+                  y: 400,
+                  width: 512,
+                  height: 512,
+                  opacity: 1,
+                },
+              },
+            },
+          };
+          activeSymbolId
+            ? setSymbolLibrary((prev) => ({
+                ...prev,
+                [activeSymbolId]: {
+                  layers: [...(prev[activeSymbolId]?.layers || []), layer],
+                },
+              }))
+            : setLayers((prev) => [...prev, layer]);
+        }}
+      />
+    </>
   );
 }

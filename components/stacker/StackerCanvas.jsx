@@ -32,6 +32,7 @@ export default function StackerCanvas({
   onSelect,
   onChange,
   backgroundColor = "#ffffff",
+  currentFrame = 0,
 }) {
   const trRef = useRef();
   const shapeRefs = useRef({});
@@ -43,6 +44,16 @@ export default function StackerCanvas({
       trRef.current.getLayer().batchDraw();
     }
   }, [selectedId, layers]);
+
+  const getAnimatedProps = (layer) => {
+    if (!layer.animations || !Array.isArray(layer.animations)) return layer;
+    const keyframe = layer.animations.find((f) => f.frame === currentFrame);
+    if (!keyframe) return layer;
+    return {
+      ...layer,
+      ...keyframe.props,
+    };
+  };
 
   return (
     <div className="border shadow bg-white inline-block">
@@ -71,33 +82,33 @@ export default function StackerCanvas({
         {/* Content Layer */}
         <Layer>
           {layers.map((layer) => {
-            if (layer.visible === false) {
-              return null; // 🔥 Hide if not visible
-            }
+            const display = getAnimatedProps(layer);
 
-            if (layer.type === "text") {
+            if (display.visible === false) return null;
+
+            if (display.type === "text") {
               return (
                 <Text
-                  key={layer.id}
-                  ref={(el) => (shapeRefs.current[layer.id] = el)}
-                  text={layer.content}
-                  x={layer.x}
-                  y={layer.y}
-                  fontSize={layer.fontSize || 24}
-                  fontFamily={layer.fontFamily || "Arial"}
-                  fill={layer.fill || "#000"}
-                  draggable={!layer.locked}
-                  onClick={() => !layer.locked && onSelect(layer.id)}
-                  onTap={() => !layer.locked && onSelect(layer.id)}
+                  key={display.id}
+                  ref={(el) => (shapeRefs.current[display.id] = el)}
+                  text={display.content}
+                  x={display.x}
+                  y={display.y}
+                  fontSize={display.fontSize || 24}
+                  fontFamily={display.fontFamily || "Arial"}
+                  fill={display.fill || "#000"}
+                  draggable={!display.locked}
+                  onClick={() => !display.locked && onSelect(display.id)}
+                  onTap={() => !display.locked && onSelect(display.id)}
                   onDragEnd={(e) =>
-                    onChange(layer.id, {
+                    onChange(display.id, {
                       x: e.target.x(),
                       y: e.target.y(),
                     })
                   }
                   onTransformEnd={(e) => {
-                    const node = shapeRefs.current[layer.id];
-                    onChange(layer.id, {
+                    const node = shapeRefs.current[display.id];
+                    onChange(display.id, {
                       x: node.x(),
                       y: node.y(),
                       width: node.width() * node.scaleX(),
@@ -110,11 +121,11 @@ export default function StackerCanvas({
               );
             }
 
-            if (layer.type === "image") {
+            if (display.type === "image") {
               return (
                 <EditableImage
-                  key={layer.id}
-                  layer={layer}
+                  key={display.id}
+                  layer={display}
                   onSelect={onSelect}
                   onChange={onChange}
                   shapeRefs={shapeRefs}
@@ -122,34 +133,34 @@ export default function StackerCanvas({
               );
             }
 
-            if (layer.type === "shape") {
-              const Shape = shapeComponentMap[layer.shape] || Rect;
+            if (display.type === "shape") {
+              const Shape = shapeComponentMap[display.shape] || Rect;
               return (
                 <Shape
-                  key={layer.id}
-                  ref={(el) => (shapeRefs.current[layer.id] = el)}
-                  x={layer.x}
-                  y={layer.y}
-                  width={layer.width}
-                  height={layer.height}
-                  fill={layer.fill}
-                  stroke={layer.stroke}
-                  strokeWidth={layer.strokeWidth}
-                  numPoints={layer.shape === "star" ? 5 : undefined}
-                  innerRadius={layer.shape === "star" ? 20 : undefined}
-                  outerRadius={layer.shape === "star" ? 40 : undefined}
-                  draggable={!layer.locked}
-                  onClick={() => !layer.locked && onSelect(layer.id)}
-                  onTap={() => !layer.locked && onSelect(layer.id)}
+                  key={display.id}
+                  ref={(el) => (shapeRefs.current[display.id] = el)}
+                  x={display.x}
+                  y={display.y}
+                  width={display.width}
+                  height={display.height}
+                  fill={display.fill}
+                  stroke={display.stroke}
+                  strokeWidth={display.strokeWidth}
+                  numPoints={display.shape === "star" ? 5 : undefined}
+                  innerRadius={display.shape === "star" ? 20 : undefined}
+                  outerRadius={display.shape === "star" ? 40 : undefined}
+                  draggable={!display.locked}
+                  onClick={() => !display.locked && onSelect(display.id)}
+                  onTap={() => !display.locked && onSelect(display.id)}
                   onDragEnd={(e) =>
-                    onChange(layer.id, {
+                    onChange(display.id, {
                       x: e.target.x(),
                       y: e.target.y(),
                     })
                   }
                   onTransformEnd={(e) => {
-                    const node = shapeRefs.current[layer.id];
-                    onChange(layer.id, {
+                    const node = shapeRefs.current[display.id];
+                    onChange(display.id, {
                       x: node.x(),
                       y: node.y(),
                       width: node.width() * node.scaleX(),
@@ -175,7 +186,7 @@ export default function StackerCanvas({
 function EditableImage({ layer, onSelect, onChange, shapeRefs }) {
   const [image] = useImage(layer.url, "anonymous");
 
-  if (layer.visible === false) return null; // 🔥 Hide invisible images
+  if (layer.visible === false) return null;
 
   return (
     <Image

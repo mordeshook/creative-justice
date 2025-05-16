@@ -309,3 +309,41 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+[functions.generate-image-to-video]
+verify_jwt = false
+
+[functions."start-video-job"]
+verify_jwt = false
+
+[functions."get-video-result"]
+verify_jwt = false
+
+[functions."start-runway-video"]
+verify_jwt = false
+
+[functions."get-runway-video"]
+verify_jwt = false
+
+[functions."generate-controlnet-inpaint"]
+verify_jwt = false
+
+[functions."generate-image-v2beta"]
+verify_jwt = false
+
+[functions."generate-image-search-and-replace"]
+verify_jwt = false
+
+[functions."start-runway-text-video"]
+verify_jwt = false
+
+[functions."get-runway-text-video"]
+verify_jwt = false
+
+[functions."start-minimax-video"]
+  entrypoint = "functions/start-minimax-video/index.ts"
+  verify_jwt = false
+
+[functions."get-minimax-video"]
+  entrypoint = "functions/get-minimax-video/index.ts"
+  verify_jwt = false

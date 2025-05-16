@@ -1,5 +1,4 @@
-// components/stacker/LayerControls.jsx
-
+//components\stacker\LayerControls.jsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -22,13 +21,19 @@ export default function LayerControls({
     }
   };
 
+  // Safety check for layers array
+  if (!Array.isArray(layers)) return <p className="text-sm text-red-500">⚠️ Layer data not available</p>;
+
   return (
     <div className="w-full space-y-2">
-      <h2 className="font-semibold text-lg">Layers</h2>
+      <h2 className="font-semibold text-lg">Stacks</h2>
+      
+      {/* Handle case where no layers exist */}
       {layers.length === 0 && (
-        <p className="text-sm text-gray-500">No layers yet</p>
+        <p className="text-sm text-gray-500">No stacks yet</p>
       )}
 
+      {/* Loop through layers safely */}
       {layers.map((layer, index) => (
         <div
           key={layer.id}

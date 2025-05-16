@@ -5,7 +5,7 @@
 import { useState } from "react";
 import ExportOptions from "@/components/stacker/ExportOptions";
 import LayerControls from "@/components/stacker/LayerControls";
-import ShapeTools from "@/components/stacker/ShapeTools";
+import ToolPanel from "@/components/stacker/ToolPanel"; // ✅ moved import
 
 function AccordionSection({ title, children, isOpen, onToggle }) {
   return (
@@ -36,15 +36,17 @@ export default function LeftPanel({
 }) {
   const [accordion, setAccordion] = useState({
     layers: true,
-    shapes: true,
+    toolpanel: true, // ✅ added toolpanel state
     background: true,
     export: true,
   });
 
   return (
     <div className="min-w-[320px] max-w-[340px] shrink-0 p-4 space-y-4 overflow-y-auto border-r bg-gray-50">
+      
+      {/* Stacks (Layers) */}
       <AccordionSection
-        title="Layers"
+        title="Stacks"
         isOpen={accordion.layers}
         onToggle={() =>
           setAccordion((prev) => ({ ...prev, layers: !prev.layers }))
@@ -62,16 +64,18 @@ export default function LeftPanel({
         />
       </AccordionSection>
 
+      {/* Tool Panel — new accordion section */}
       <AccordionSection
-        title="Shape Tools"
-        isOpen={accordion.shapes}
+        title="Tool Panel"
+        isOpen={accordion.toolpanel}
         onToggle={() =>
-          setAccordion((prev) => ({ ...prev, shapes: !prev.shapes }))
+          setAccordion((prev) => ({ ...prev, toolpanel: !prev.toolpanel }))
         }
       >
-        <ShapeTools onAddShape={onAddShape} />
+        <ToolPanel />
       </AccordionSection>
 
+      {/* Canvas Background */}
       <AccordionSection
         title="Canvas Background"
         isOpen={accordion.background}
@@ -92,6 +96,7 @@ export default function LeftPanel({
         </select>
       </AccordionSection>
 
+      {/* Export Panel */}
       <AccordionSection
         title="Export As"
         isOpen={accordion.export}
