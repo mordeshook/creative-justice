@@ -1,4 +1,5 @@
-// components/BrandLogoGenerator.jsx
+//components\BrandLogoGenerator.jsx
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,11 +10,14 @@ const BrandLogoGenerator = ({ draftId }) => {
   const { user } = useUser();
   const [brandProfile, setBrandProfile] = useState(null);
   const [stories, setStories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user || !draftId) return;
 
     const fetchBrandProfile = async () => {
+      setIsLoading(true);
+
       const { data, error } = await supabase
         .from('brand_profiles_drafts')
         .select('*')
@@ -22,44 +26,50 @@ const BrandLogoGenerator = ({ draftId }) => {
 
       if (!error && data) {
         setBrandProfile(data);
-        fetchGeneratedStories(data);  // AI-generated stories based on DB data
+        await fetchGeneratedStories(data);
       } else {
         console.error('Fetch error:', error);
       }
+
+      setIsLoading(false);
     };
 
     const fetchGeneratedStories = async (profile) => {
-      const res = await fetch('/api/generate-logo-stories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand_profile: profile }),
-      });
+      try {
+        const res = await fetch('/api/generate-logo-stories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brand_profile: profile }),
+        });
 
-      const { stories } = await res.json();
-      setStories(stories);
+        const { stories } = await res.json();
+        setStories(stories);
+      } catch (err) {
+        console.error('Error fetching stories:', err);
+        setStories([]);
+      }
     };
 
     fetchBrandProfile();
 
     const subscription = supabase
       .channel('brand_profiles_updates')
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'brand_profiles_drafts', 
-        filter: `id=eq.${draftId}` 
-      }, (payload) => {
-        setBrandProfile(payload.new);
-        fetchGeneratedStories(payload.new);  // regenerate if DB updates
-      })
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'brand_profiles_drafts', filter: `id=eq.${draftId}` },
+        async (payload) => {
+          setBrandProfile(payload.new);
+          setIsLoading(true);
+          await fetchGeneratedStories(payload.new);
+          setIsLoading(false);
+        }
+      )
       .subscribe();
 
     return () => supabase.removeChannel(subscription);
   }, [draftId, user]);
 
   const generateSymbolFromStory = (story, colors) => {
-    // You'll implement this: logic for visually interpreting each story.
-    // Example placeholder logic for now:
     const size = Math.floor(Math.random() * 60) + 80;
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
@@ -72,7 +82,14 @@ const BrandLogoGenerator = ({ draftId }) => {
     };
   };
 
-  if (!brandProfile || stories.length === 0) return <div>Generating logos...</div>;
+  if (isLoading || !brandProfile || stories.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="loader border-4 border-t-4 border-gray-200 border-t-nuveuu-primary rounded-full w-12 h-12 animate-spin"></div>
+        <p className="mt-4 text-sm text-gray-600">Generating logos...</p>
+      </div>
+    );
+  }
 
   const colors = brandProfile.brand_colors || ['#FF5733', '#33A1FF'];
 
