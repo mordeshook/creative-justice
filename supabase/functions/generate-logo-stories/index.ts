@@ -1,3 +1,5 @@
+//supabase\functions\generate-logo-stories\index.ts
+
 import { serve } from 'https://deno.land/std/http/server.ts';
 import OpenAI from 'https://deno.land/x/openai@v4.24.0/mod.ts';
 

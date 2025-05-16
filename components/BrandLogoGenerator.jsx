@@ -82,14 +82,14 @@ const BrandLogoGenerator = ({ draftId }) => {
     };
   };
 
-  if (isLoading || !brandProfile || stories.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <div className="loader border-4 border-t-4 border-gray-200 border-t-nuveuu-primary rounded-full w-12 h-12 animate-spin"></div>
-        <p className="mt-4 text-sm text-gray-600">Generating logos...</p>
-      </div>
-    );
-  }
+  if (isLoading || !brandProfile || !Array.isArray(stories) || stories.length === 0) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <div className="loader border-4 border-t-4 border-gray-200 border-t-nuveuu-primary rounded-full w-12 h-12 animate-spin"></div>
+      <p className="mt-4 text-sm text-gray-600">Generating logos...</p>
+    </div>
+  );
+}
 
   const colors = brandProfile.brand_colors || ['#FF5733', '#33A1FF'];
 

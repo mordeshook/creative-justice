@@ -1,19 +1,17 @@
+//app\api\generate-logo-stories\route.js
+
 export async function POST(request) {
   const body = await request.json();
 
-  const response = await fetch(
-    'https://tyxhurtlifaufindxhex.supabase.co/functions/v1/generate-logo-stories',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer YOUR_SUPABASE_ANON_KEY'
-      },
-      body: JSON.stringify(body),
-    }
-  );
+  const { data, error } = await supabase.functions.invoke('generate-logo-stories', {
+    body
+  });
 
-  const data = await response.json();
+  if (error) {
+    console.error('Supabase function error:', error);
+    return new Response(JSON.stringify({ error }), { status: 500 });
+  }
+
   return new Response(JSON.stringify(data), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
